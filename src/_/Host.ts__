@@ -1,0 +1,390 @@
+import HostError from './HostError';
+import State from './State';
+import NullValidator from './validator/NullValidator';
+import {
+    IListeners,
+    ISourceActions,
+    ISourceStates,
+    IValidator,
+    THostErrors, THostProps,
+    THostState, TSourceErrors, TSourceProps,
+    TSourceState, TSourceStateListener,
+    TStateListener,
+} from './types';
+
+class Host {
+
+    /**
+     * @type {ISourceStates}
+     */
+    protected sources: ISourceStates = {};
+
+    /**
+     * @type {IListeners}
+     */
+    protected listeners: IListeners = {
+        host: [],
+        source: {}
+    };
+
+    /**
+     * @type {IValidator}
+     */
+    protected validator: IValidator;
+
+    /**
+     * @param validator
+     */
+    public constructor(validator?: IValidator) {
+        this.setValidator(validator || new NullValidator());
+    }
+
+    /**
+     * Sets validator
+     *
+     * @param validator
+     *
+     * @returns {void}
+     */
+    public setValidator = (validator: IValidator): void => {
+        this.validator = validator;
+    };
+
+    /**
+     * Adds new source
+     *
+     * @param name
+     * @param defaultValue
+     *
+     * @returns {ISourceActions}
+     */
+    public addSource = (name: string, defaultValue: unknown = null): ISourceActions => {
+        const {sources, setSourceState } = this;
+
+        if (sources.hasOwnProperty(name)) {
+            throw new HostError(`Source "${name}" is already registered`);
+        }
+
+        // store initial source state
+        sources[name] = new State<TSourceErrors, unknown>(defaultValue);
+
+        return {
+            listen: (listener: TSourceStateListener) => {
+                const unsubscribe = this.subscribe(listener, name);
+
+                // remove from sources when source is unsubscribed
+                return () => {
+                    unsubscribe();
+                    this.removeSource(name);
+                };
+            },
+            update: (value: unknown) => setSourceState(name, sources[name].update({ value })),
+            validate: () => setSourceState(name, sources[name], true),
+        }
+    };
+
+    /**
+     * Removes existing source
+     *
+     * @param name
+     *
+     * @returns {void}
+     */
+    public removeSource = (name: string): void => {
+        delete this.sources[name];
+    };
+
+    /**
+     * Adds state changes listener
+     *
+     * @param listener
+     * @param name
+     *
+     * @returns {void}
+     */
+    public listen = <P>(listener: TStateListener<P>, name?: string): () => void => {
+        return this.subscribe(listener, name);
+    };
+
+    /**
+     * Inits sources with provided values or uses default
+     *
+     * @param values
+     *
+     * @returns {void}
+     */
+    public init = (values?: object): void => {
+        each(this.sources, (name, state) => {
+            const value = values ? values[name] : values;
+            state = state.reset();
+            state = value ? state.update({ value }) : state;
+            this.commitSourceState(name, state);
+        });
+
+        this.commitHostState(this.buildHostState());
+    };
+
+    /**
+     * Sets source values to null
+     *
+     * @returns {void}
+     */
+    public clear = (): void => {
+        each(this.sources, (name, state) => {
+            this.commitSourceState(name, state.reset().update({value: null}));
+        });
+
+        this.commitHostState(this.buildHostState());
+    };
+
+    /**
+     * Sets sources errors
+     *
+     * @param errors
+     *
+     * @returns {void}
+     */
+    public setErrors = (errors: THostErrors | null): void => {
+
+        // set new or remove existing errors
+        each(this.sources, (name, state) => {
+            const err = errors && errors[name] ? errors[name] : null;
+            this.commitSourceState(name, state.update({errors: err}));
+        });
+
+        this.commitHostState(this.buildHostState());
+    };
+
+    /**
+     * Validates host state
+     *
+     * @returns {Promise<THostState>}
+     */
+    public validate = (): Promise<THostState> => {
+        const { buildHostState, commitHostState } = this;
+
+        let hostState = buildHostState().update({busy: true});
+        commitHostState(hostState);
+
+        return this.applyValidator(this.sources)
+
+            // provide validated state to consumers
+            .then(() => hostState = buildHostState())
+
+            // init sources with validation results
+            .finally(() => this.setErrors(hostState.errors));
+    };
+
+    /**
+     * Sets new source state and commits updates to storage and listeners
+     *
+     * @param name
+     * @param state
+     * @param validate
+     *
+     * @returns {void}
+     */
+    protected setSourceState = (name: string, state: TSourceState, validate?: boolean): void => {
+        const { commitSourceState, commitHostState, buildHostState } = this;
+
+        state = state.update({touched: true});
+
+        // commit right away
+        if(!validate) {
+            commitSourceState(name, state);
+            commitHostState(buildHostState());
+            return;
+        }
+
+        // validate
+        state = state.update({busy: true});
+        commitSourceState(name, state);
+        commitHostState(buildHostState());
+
+        this.applyValidator({[name]: state})
+            .then(errObj => {
+                state = state.update({errors: errObj[name]});
+            })
+            .catch(err => {
+                // always mark state as failed
+                state = state.update({errors: ['🤒']});
+                console.error(err);
+            })
+            .finally(() => {
+                commitSourceState(name, state.update({busy: false}));
+                commitHostState(buildHostState());
+            });
+    };
+
+
+
+
+    /**
+     * Sets new source state and commits updates to storage and listeners
+     *
+     * @param name
+     * @param state
+     *
+     * @returns {void}
+     */
+    // protected setSourceState(name: string, state: TSourceState): void {
+    //     const { commitSourceState, commitHostState, buildHostState } = this;
+    //
+    //     state = state.update({busy: true, touched: true});
+    //
+    //     commitSourceState(name, state);
+    //     commitHostState(buildHostState());
+    //
+    //     this.applyValidator({[name]: state})
+    //         .then(sources => {
+    //             state = sources[name];
+    //         })
+    //         .catch(err => {
+    //             // always mark state as failed
+    //             state = state.update({errors: ['🤒']});
+    //             console.error(err);
+    //         })
+    //         .finally(() => {
+    //             commitSourceState(name, state.update({busy: false}));
+    //             commitHostState(buildHostState());
+    //         });
+    // }
+
+    /**
+     * Commits source state to storage and listeners
+     *
+     * @param name
+     * @param state
+     *
+     * @returns {void}
+     */
+    protected commitSourceState = (name: string|number, state: TSourceState): void => {
+        this.sources[name] = state;
+        this.publish(state, name);
+    };
+
+    /**
+     * Commits host state to listeners
+     *
+     * @param state
+     *
+     * @returns {void}
+     */
+    protected commitHostState = (state: THostState): void => {
+        this.publish(state);
+    };
+
+    /**
+     * Builds host state from sources
+     *
+     * @returns {THostState}
+     */
+    protected buildHostState = (): THostState => {
+        const value = {};
+        let errors: THostErrors|null = null;
+        let touched = false, busy = false;
+
+        each(this.sources, (name, state) => {
+            value[name] = state.value;
+
+            if(state.touched) {
+                touched = true;
+            }
+
+            if(state.busy) {
+                busy = true;
+            }
+
+            if(state.errors) {
+                errors = errors || {};
+                errors[name] = state.errors;
+            }
+        });
+
+        return new State<THostErrors, object>().update({value, errors, touched, busy});
+    };
+
+    /**
+     * Validates sources values
+     *
+     * @param sources
+     *
+     * @returns {Promise<ISourceStates>}
+     */
+    protected applyValidator(sources: ISourceStates): Promise<{[name: string]: TSourceErrors|null}> {
+        const queue: Promise<{[name: string]: TSourceErrors|null}>[] = [];
+
+        each(sources, (name, state) => {
+            const p = this.validator.validate(name, state.value)
+                .then((errors) => {
+                    return {[name]: errors};
+                });
+
+            queue.push(p);
+        });
+
+        // resolve all promises and build new sources object
+        // from array of individual {name: state} pairs
+        return Promise
+            .all(queue)
+            .then((arr) => arr.reduce((prev, cur) => ({...prev, ...cur}), {}));
+    }
+
+    /**
+     * Subscribes to state updates
+     *
+     * @param listener
+     * @param name
+     *
+     * @returns {void}
+     */
+    protected subscribe = <P>(listener: TStateListener<P>, name?: string|number): () => void => {
+        const listeners = this.listeners;
+        let group: unknown[];
+
+        if(name != null) {
+            group = listeners.source[name] = (listeners.source[name] || []);
+        } else {
+            group = listeners.host;
+        }
+
+        const len = group.push(listener);
+
+        return (): void => {
+            group.splice(len-1, 1);
+        };
+    };
+
+    /**
+     * Publishes state update
+     *
+     * @param state
+     * @param name
+     *
+     * @returns {void}
+     */
+    protected publish = (state: THostState|TSourceState, name?: string|number): void => {
+        const listeners = this.listeners;
+        const group = name ? listeners.source[name] : listeners.host;
+
+        for(const listener of group) {
+            listener(state.getProps() as THostProps & TSourceProps);
+        }
+    };
+}
+
+/**
+ * Applies a callback to each object item
+ *
+ * @param obj
+ * @param callback
+ *
+ * @returns {void}
+ */
+function each<T extends object>(obj: T, callback: (name: keyof T, value: T[keyof T]) => void): void {
+    for(const name in obj) {
+        callback(name, obj[name]);
+    }
+}
+
+export { Host }
