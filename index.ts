@@ -8,4 +8,5 @@ export {
     TSourceProps,
     TEventName,
     THostErrors,
+    TStateListener
 } from './src/types';

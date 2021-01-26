@@ -10,13 +10,13 @@ export interface IState<E, V> extends IStateProps<E, V> {
     update(props: Partial<IStateProps<E, V>>): this;
     getProps(): IStateProps<E, V>;
     subscribe(eventName: TEventName, listener: TStateListener<IStateProps<E, V>>): () => void;
-    emit(eventName: TEventName): void;
+    emit(eventName: TEventName, issuer?: string): void;
 }
 
 export type THostErrors = {[name: string]: string[]|null} | null;
 export type TSourceErrors = string[] | null;
 
-export type THostProps = IStateProps<THostErrors, object>;
+export type THostProps<V = {[name: string]: any}> = IStateProps<THostErrors, V>;
 export type TSourceProps = IStateProps<TSourceErrors, any>;
 
 export type THostState = IState<THostErrors, object>;
@@ -24,7 +24,7 @@ export type TSourceState = IState<TSourceErrors, any>;
 
 export type TEventName = '*' | 'init' | 'clear' | 'update' | 'validate';
 
-export type TStateListener<P> = (props: P, eventName: TEventName) => void;
+export type TStateListener<P> = (props: P, eventName: TEventName, issuer?: string) => void;
 
 export interface ISourceStates {
     [name: string]: TSourceState;
@@ -38,7 +38,7 @@ export interface ISourceActions {
 }
 
 export interface IValidator {
-    validate: (name:  string|number, value: any) => Promise<TSourceErrors|null>;
+    validate: (name:  string|number, value: any, hostValues: {[name: string]: any}) => Promise<TSourceErrors|null>;
 }
 
 export interface IOptions {

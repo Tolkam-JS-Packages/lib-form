@@ -86,14 +86,15 @@ export default class State<E, V> implements IState<E, V> {
      * Emits change
      *
      * @param eventName
+     * @param issuer
      */
-    public emit(eventName: TEventName): void {
+    public emit(eventName: TEventName, issuer?: string): void {
         const { listeners } = this;
         const eventListeners = [listeners[eventName], listeners[EVENT_ANY]].filter(Boolean);
 
         for(const group of eventListeners) {
             for(const listener of group) {
-                listener(this.getProps(), eventName);
+                listener(this.getProps(), eventName, issuer);
             }
         }
     }

@@ -237,17 +237,31 @@ class Host {
     };
 
     /**
+     * Gets current host state
+     *
+     * @return {THostState}
+     */
+    public getState = (): THostState => {
+        return this.hostState;
+    };
+
+    /**
      * Validates host state
      *
      * @returns {Promise<THostProps>}
      */
-    public validate = (callback?: (props: THostProps) => void): void => {
+    public validate = (callback?: (props: THostProps) => void, sourceName?: string): void => {
         const that = this;
-        const { hostState, rebuildHostState } = that;
+        const { hostState, rebuildHostState, sources } = that;
 
         hostState.update({busy: true}).emit(EVENT_VALIDATE);
 
-        that.applyValidator(that.sources)
+        // validate only specific source or all
+        const toValidate = sourceName
+            ? {[sourceName]: sources[sourceName]}
+            : sources;
+
+        that.applyValidator(toValidate)
             .then((errors) => {
                 this.eachSource((name, state) => {
                     if(errors.hasOwnProperty(name)) {
@@ -255,7 +269,7 @@ class Host {
                     }
                 });
 
-                rebuildHostState().emit(EVENT_VALIDATE);
+                rebuildHostState().emit(EVENT_VALIDATE, sourceName);
                 callback && callback(hostState.getProps());
             });
     };
@@ -279,7 +293,7 @@ class Host {
         });
 
         state.emit(EVENT_UPDATE);
-        rebuildHostState().emit(EVENT_UPDATE);
+        rebuildHostState().emit(EVENT_UPDATE, name);
 
         this.applyValidator({[name]: state})
             .then(errors => {
@@ -298,7 +312,7 @@ class Host {
             .finally(() => {
                 if(!pending) {
                     state.update({busy: false}).emit(EVENT_UPDATE);
-                    rebuildHostState().emit(EVENT_UPDATE);
+                    rebuildHostState().emit(EVENT_UPDATE, name);
                 }
             });
     };
@@ -367,7 +381,7 @@ class Host {
 
         for(const name in sources) {
             const state = sources[name];
-            const p = this.validator.validate(name, state.value)
+            const p = this.validator.validate(name, state.value, this.hostState.value || {})
                 .then((errors) => {
                     return {[name]: errors};
                 });
