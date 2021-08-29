@@ -96,15 +96,8 @@ class Host {
 
         return {
             // subscribes to source changes
-            listen: (eventName: TEventName, listener: TStateListener<TSourceProps>) => {
-                const unsubscribe = sources[name].subscribe(eventName, listener);
-
-                // remove from sources when source is unsubscribed
-                return () => {
-                    unsubscribe();
-                    that.removeSource(name);
-                };
-            },
+            listen: (eventName: TEventName, listener: TStateListener<TSourceProps>) =>
+                sources[name].subscribe(eventName, listener),
 
             // updates source value
             update: (value: V|null) => {

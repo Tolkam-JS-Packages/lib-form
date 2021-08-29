@@ -14,7 +14,7 @@ export default class State<E, V> implements IState<E, V> {
      *  @type {object}
      */
     protected listeners: {
-        [eventName: string]: TStateListener<IStateProps<E, V>>[];
+        [eventName: string]: Set<TStateListener<IStateProps<E, V>>>;
     } = {};
 
     /**
@@ -73,12 +73,11 @@ export default class State<E, V> implements IState<E, V> {
      */
     public subscribe(eventName: TEventName, listener: TStateListener<IStateProps<E, V>>): () => void {
         const { listeners } = this;
-        listeners[eventName] = listeners[eventName] || [];
+        listeners[eventName] = listeners[eventName] || new Set();
 
-        const len = listeners[eventName].push(listener);
-
+        listeners[eventName].add(listener);
         return (): void => {
-            listeners[eventName].splice(len-1, 1);
+            listeners[eventName].delete(listener);
         };
     }
 
@@ -90,12 +89,14 @@ export default class State<E, V> implements IState<E, V> {
      */
     public emit(eventName: TEventName, issuer?: string): void {
         const { listeners } = this;
-        const eventListeners = [listeners[eventName], listeners[EVENT_ANY]].filter(Boolean);
+        let eventListeners = [listeners[eventName], listeners[EVENT_ANY]];
+
+        // keep unique and not empty
+        eventListeners = eventListeners
+            .filter((v, k) => v != null && eventListeners.indexOf(v) === k);
 
         for(const group of eventListeners) {
-            for(const listener of group) {
-                listener(this.getProps(), eventName, issuer);
-            }
+            group.forEach((listener) => listener(this.getProps(), eventName, issuer));
         }
     }
 
