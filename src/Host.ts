@@ -99,6 +99,13 @@ class Host {
             listen: (eventName: TEventName, listener: TStateListener<TSourceProps>) =>
                 sources[name].subscribe(eventName, listener),
 
+            // sets default source value without
+            // changing the touched or busy states
+            init: (value: V|null) => {
+                sources[name].update({value});
+                sources[name].emit(EVENT_INIT, name);
+            },
+
             // updates source value
             update: (value: V|null) => {
                 // set host state as busy until debounced update action is fired
@@ -294,7 +301,7 @@ class Host {
 
                 // emit only if no pending validations left (only the last validation result)
                 if(!pending) {
-                    state.update({errors: errors[name]});
+                    state.update({errors: errors[name] ?? null});
                 }
             })
             .catch(err => {
@@ -376,7 +383,7 @@ class Host {
             const state = sources[name];
             const p = this.validator.validate(name, state.value, this.hostState.value || {})
                 .then((errors) => {
-                    return {[name]: errors};
+                    return {[name]: errors ?? null};
                 });
 
             queue.push(p);

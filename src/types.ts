@@ -32,6 +32,7 @@ export interface ISourceStates {
 
 export interface ISourceActions {
     listen: (eventName: TEventName, listener: TStateListener<TSourceProps>) => () => void;
+    init: (value: any) => void;
     update: (value: any) => void;
     setBusy: (busy: boolean) => void;
     setErrors: (errors: string[]) => void;

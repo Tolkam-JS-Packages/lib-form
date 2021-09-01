@@ -5,8 +5,9 @@ export {
     IValidator,
     ISourceActions,
     THostProps,
-    TSourceProps,
-    TEventName,
     THostErrors,
+    TSourceProps,
+    TSourceErrors,
+    TEventName,
     TStateListener
 } from './src/types';
