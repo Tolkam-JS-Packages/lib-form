@@ -22,7 +22,7 @@ export type TSourceProps = IStateProps<TSourceErrors, any>;
 export type THostState = IState<THostErrors, object>;
 export type TSourceState = IState<TSourceErrors, any>;
 
-export type TEventName = '*' | 'init' | 'clear' | 'update' | 'validate';
+export type TEventName = '*' | 'init' | 'clear' | 'update' | 'validate' | 'busy';
 
 export type TStateListener<P> = (props: P, eventName: TEventName, issuer?: string) => void;
 

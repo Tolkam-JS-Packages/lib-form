@@ -2,7 +2,7 @@ import { debounce as debounceFn } from '@tolkam/lib-utils';
 import HostError from './HostError';
 import State from './State';
 import NullValidator from './validator/NullValidator';
-import { EVENT_CLEAR, EVENT_INIT, EVENT_UPDATE, EVENT_VALIDATE } from './events';
+import { EVENT_BUSY, EVENT_CLEAR, EVENT_INIT, EVENT_UPDATE, EVENT_VALIDATE } from './events';
 import {
     ISourceActions,
     ISourceStates, TStateListener,
@@ -221,19 +221,19 @@ class Host {
     public setBusy = (busy: boolean, specificSources?: string[]): void => {
 
         if(!specificSources) {
-            this.rebuildHostState().update({busy}).emit(EVENT_VALIDATE);
+            this.rebuildHostState().update({busy}).emit(EVENT_BUSY);
             return;
         }
 
         let hasChanges = false;
         this.eachSource((name, state) => {
             if(specificSources && specificSources.indexOf(name) !== -1) {
-                state.update({busy}).emit(EVENT_VALIDATE);
+                state.update({busy}).emit(EVENT_BUSY);
                 hasChanges = true;
             }
         });
 
-        hasChanges && this.rebuildHostState().emit(EVENT_VALIDATE);
+        hasChanges && this.rebuildHostState().emit(EVENT_BUSY);
     };
 
     /**
@@ -254,7 +254,7 @@ class Host {
         const that = this;
         const { hostState, rebuildHostState, sources } = that;
 
-        hostState.update({busy: true}).emit(EVENT_VALIDATE);
+        hostState.update({busy: true}).emit(EVENT_BUSY);
 
         // validate only specific source or all
         const toValidate = sourceName
@@ -291,9 +291,8 @@ class Host {
             busy: true,
             touched: true
         });
-
-        state.emit(EVENT_UPDATE);
-        rebuildHostState().emit(EVENT_UPDATE, name);
+        state.emit(EVENT_BUSY);
+        rebuildHostState().emit(EVENT_BUSY, name);
 
         this.applyValidator({[name]: state})
             .then(errors => {
