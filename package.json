@@ -1,18 +1,12 @@
 {
     "name": "@tolkam/lib-form",
-    "description": "Containers for forms and fields",
-    "version": "1.0.0",
+    "description": "Form and fields state management with change listeners and data validation",
     "main": "index.ts",
     "license": "UNLICENSED",
-    "private": true,
     "dependencies": {
-        "@tolkam/lib-utils": "file:D:/dev-packages/js/tolkam/lib-utils"
+        "@tolkam/lib-utils": "^0.2.0"
     },
     "devDependencies": {
-        "tslib": "^1.9.3",
-        "@typescript-eslint/eslint-plugin": "^2.6.1",
-        "@typescript-eslint/parser": "^2.6.1",
-        "eslint": "^6.6.0",
-        "typescript": "^3.7.2"
+        "tslib": "^2.3.1"
     }
 }
