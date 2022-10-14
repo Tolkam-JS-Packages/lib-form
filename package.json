@@ -1,6 +1,7 @@
 {
     "name": "@tolkam/lib-form",
     "description": "Form and fields state management with change listeners and data validation",
+    "version": "0.0.0",
     "main": "index.ts",
     "license": "UNLICENSED",
     "dependencies": {
